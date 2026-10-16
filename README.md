@@ -1,7 +1,7 @@
-# Refund Replay Exercise
+# Refund Replay Exercise — v0.2 candidate
 
 A valid, unexpired authorization can still be replayable. This local exercise
-contrasts two paths for a synthetic **$10.00 USD** refund. Both bind amount,
+contrasts two paths for a synthetic **$10.00 USD** refund. Both bind the authenticated actor, amount,
 currency, payment, merchant, and action; only the corrected path atomically
 consumes the grant before dispatch. MIT licensed; no product, account, package
 installation, API key, network service, or real money is involved.
@@ -9,9 +9,8 @@ installation, API key, network service, or real money is involved.
 ## Run (Python 3.10+, under five minutes)
 
 ```sh
-git clone https://github.com/Tarshann/refund-replay-exercise.git
+git clone --branch feat/grant-vs-transport-replay https://github.com/Tarshann/refund-replay-exercise.git
 cd refund-replay-exercise
-git checkout v0.1
 python3 run.py
 ```
 
@@ -31,12 +30,37 @@ cents**; `passed: true`. The baseline vulnerability is reproduced intentionally.
 Each lane starts with fresh databases. Fixed tokens and clock make the inputs
 deterministic; tokens are test fixtures, never deployment credentials.
 
+## Authenticated transport versus approval consumption
+
+The new `transport_lanes` report exercises signed HMAC envelopes separately from
+the approval boundary. A server-owned key registry resolves the authenticated
+actor; the request cannot assert its own identity. Both lanes atomically claim
+authenticated transport nonces in a separate SQLite store. Only the corrected
+boundary consumes the actor-bound approval grant.
+
+| Authenticated request (same grant) | Baseline | Corrected |
+| --- | --- | --- |
+| Wrong actor, own valid key, fresh nonce | Wrong actor; no handler entry | Wrong actor; no handler entry |
+| Rightful actor, nonce-1 | Allowed | Allowed |
+| Rightful actor, nonce-2 | Allowed again | Refused: reused grant |
+| Repeat exact nonce-2 message | Transport replay refused | Transport replay refused |
+
+Both fresh-nonce messages authenticate. Expected destination totals remain two
+$10 entries versus one. Wrong-actor refusal does not burn the rightful actor's
+grant. A forged HMAC cannot burn either nonce or grant. The report records actors,
+nonces, decisions and separately observed destination entries. This is an original
+local fixture, not an adapter or test of any third-party toolkit.
+
+The published `v0.1` tag is unchanged. This branch is a v0.2 candidate; no v0.2
+release is claimed. Report schema is `refund-replay-observation/v2`. Old fixture
+databases are not migrated: the runner always starts fresh temporary databases.
+
 ## What it proves
 
 For these enumerated local invocations, the baseline accepts reuse and the
 corrected boundary consumes authority once. A separate observer process reads
 the synthetic destination database, independent of boundary verdicts, to check
-whether its handler recorded entry. Tests include scope mutation, expiry,
+whether its handler recorded entry. Tests include authenticated actor mismatch, fresh-nonce grant reuse, scope mutation, expiry,
 malformed inputs, concurrent connections, restart persistence, and dispatch
 failure. The report includes source hashes. See [DESIGN.md](DESIGN.md).
 

@@ -19,10 +19,10 @@ class BoundaryTests(unittest.TestCase):
         initialize(self.dest)
         self.boundary = Boundary(self.grants, self.dest)
         self.refund = Refund()
-        self.boundary.issue('fixture-token', self.refund, 160)
+        self.boundary.issue('fixture-token', self.refund, 160, actor_id='actor-alice')
 
     def invoke(self, token='fixture-token', refund=None, now=100, attempt='test'):
-        return self.boundary.invoke(token, refund or self.refund, now, attempt)
+        return self.boundary.invoke(token, refund or self.refund, now, attempt, actor_id='actor-alice')
 
     def test_authorized_then_replay(self):
         self.assertEqual(self.invoke(), 'allowed')
@@ -63,7 +63,7 @@ class BoundaryTests(unittest.TestCase):
     def test_concurrent_connections_one_dispatch(self):
         def attempt(i):
             b = Boundary(self.grants, self.dest)
-            return b.invoke('fixture-token', self.refund, 100, str(i))
+            return b.invoke('fixture-token', self.refund, 100, str(i), actor_id='actor-alice')
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             results = list(pool.map(attempt, range(16)))
         self.assertEqual(results.count('allowed'), 1)
